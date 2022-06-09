@@ -58,4 +58,50 @@
         android:switchPadding="8dp"
         android:text="AR" />
 
+    <LinearLayout
+        android:id="@+id/iso_layout"
+        android:layout_width="match_parent"
+        android:orientation="horizontal"
+        android:padding="10dp"
+        android:layout_below="@id/arcore_switch"
+        android:layout_height="wrap_content">
+        <TextView
+            android:text="ISO"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"/>
+        <SeekBar
+            android:id="@+id/iso_seek_bar"
+            android:layout_weight="1"
+            android:layout_width="0dp"
+            android:layout_height="20dp"/>
+        <TextView
+            android:text="Reset Iso"
+            android:id="@+id/reset_iso"
+            android:background="#C1293B6F"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"/>
+    </LinearLayout>
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:orientation="horizontal"
+        android:padding="10dp"
+        android:layout_below="@id/iso_layout"
+        android:layout_height="wrap_content">
+        <TextView
+            android:text="SS"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"/>
+        <SeekBar
+            android:id="@+id/ss_seek_bar"
+            android:layout_weight="1"
+            android:layout_width="0dp"
+            android:layout_height="20dp"/>
+        <TextView
+            android:text="Reset SS"
+            android:id="@+id/reset_ss"
+            android:background="#C1293B6F"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"/>
+    </LinearLayout>
+
 </RelativeLayout>

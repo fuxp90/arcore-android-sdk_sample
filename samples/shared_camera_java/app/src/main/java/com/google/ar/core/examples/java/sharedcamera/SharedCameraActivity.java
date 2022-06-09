@@ -26,6 +26,7 @@ import android.hardware.camera2.CameraDevice;
 import android.hardware.camera2.CameraManager;
 import android.hardware.camera2.CaptureFailure;
 import android.hardware.camera2.CaptureRequest;
+import android.hardware.camera2.CaptureResult;
 import android.hardware.camera2.TotalCaptureResult;
 import android.media.Image;
 import android.media.ImageReader;
@@ -37,10 +38,13 @@ import android.os.ConditionVariable;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.util.Log;
+import android.util.Range;
 import android.util.Size;
 import android.view.MotionEvent;
 import android.view.Surface;
+import android.view.View;
 import android.widget.LinearLayout;
+import android.widget.SeekBar;
 import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -209,7 +213,10 @@ public class SharedCameraActivity extends AppCompatActivity
       this.color = color4f;
     }
   }
-
+  Range<Integer> mSensitivityRange;
+  Range<Long> mExposureTimeRange;
+  int mCurrentSensitivity;
+  long mCurrentExposureTime;
   // Camera device state callback.
   private final CameraDevice.StateCallback cameraDeviceCallback =
       new CameraDevice.StateCallback() {
@@ -313,6 +320,9 @@ public class SharedCameraActivity extends AppCompatActivity
             @NonNull CaptureRequest request,
             @NonNull TotalCaptureResult result) {
           shouldUpdateSurfaceTexture.set(true);
+
+          mCurrentSensitivity = result.get(CaptureResult.SENSOR_SENSITIVITY);
+          mCurrentExposureTime = result.get(CaptureResult.SENSOR_EXPOSURE_TIME);
         }
 
         @Override
@@ -385,6 +395,53 @@ public class SharedCameraActivity extends AppCompatActivity
 
     messageSnackbarHelper.setMaxLines(4);
     updateSnackbarMessage();
+
+    findViewById(R.id.reset_iso).setOnClickListener(new View.OnClickListener() {
+      @Override
+      public void onClick(View v) {
+        resetIsoAndSS();
+      }
+    });
+    findViewById(R.id.reset_ss).setOnClickListener(new View.OnClickListener() {
+      @Override
+      public void onClick(View v) {
+        resetIsoAndSS();
+      }
+    });
+      ((SeekBar)findViewById(R.id.iso_seek_bar)).setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+          @Override
+          public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+              int iso = (int) (mSensitivityRange.getLower() + progress / 100f * (mSensitivityRange.getUpper() - mSensitivityRange.getLower()));
+              updateIso(iso);
+          }
+
+          @Override
+          public void onStartTrackingTouch(SeekBar seekBar) {
+
+          }
+
+          @Override
+          public void onStopTrackingTouch(SeekBar seekBar) {
+
+          }
+      });
+    ((SeekBar)findViewById(R.id.ss_seek_bar)).setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+      @Override
+      public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+        int ss = (int) (mExposureTimeRange.getLower() + progress / 100f * (mExposureTimeRange.getUpper() - mExposureTimeRange.getLower()));
+        updateSS(ss);
+      }
+
+      @Override
+      public void onStartTrackingTouch(SeekBar seekBar) {
+
+      }
+
+      @Override
+      public void onStopTrackingTouch(SeekBar seekBar) {
+
+      }
+    });
   }
 
   @Override
@@ -502,7 +559,42 @@ public class SharedCameraActivity extends AppCompatActivity
       Log.e(TAG, "Failed to set repeating request", e);
     }
   }
-
+  private void resetIsoAndSS() {
+    Log.e(TAG, "resetIsoAndSS");
+    previewCaptureRequestBuilder.set(CaptureRequest.CONTROL_AE_MODE,CaptureRequest.CONTROL_AE_MODE_ON);
+    previewCaptureRequestBuilder.set(CaptureRequest.SENSOR_SENSITIVITY,null);
+    previewCaptureRequestBuilder.set(CaptureRequest.SENSOR_EXPOSURE_TIME,null);
+    try {
+      captureSession.setRepeatingRequest(
+          previewCaptureRequestBuilder.build(), cameraCaptureCallback, backgroundHandler);
+    } catch (CameraAccessException e) {
+      e.printStackTrace();
+    }
+  }
+  private void updateIso(int iso) {
+      Log.d(TAG,"updateIso:"+iso);
+    previewCaptureRequestBuilder.set(CaptureRequest.CONTROL_AE_MODE,CaptureRequest.CONTROL_AE_MODE_OFF);
+    previewCaptureRequestBuilder.set(CaptureRequest.SENSOR_SENSITIVITY,iso);
+    previewCaptureRequestBuilder.set(CaptureRequest.SENSOR_EXPOSURE_TIME,mCurrentExposureTime);
+      try {
+          captureSession.setRepeatingRequest(
+              previewCaptureRequestBuilder.build(), cameraCaptureCallback, backgroundHandler);
+      } catch (CameraAccessException e) {
+          e.printStackTrace();
+      }
+  }
+  private void updateSS(long ss) {
+    Log.d(TAG,"updateSS:"+ss);
+    previewCaptureRequestBuilder.set(CaptureRequest.CONTROL_AE_MODE,CaptureRequest.CONTROL_AE_MODE_OFF);
+    previewCaptureRequestBuilder.set(CaptureRequest.SENSOR_SENSITIVITY,mCurrentSensitivity);
+    previewCaptureRequestBuilder.set(CaptureRequest.SENSOR_EXPOSURE_TIME,ss);
+    try {
+      captureSession.setRepeatingRequest(
+          previewCaptureRequestBuilder.build(), cameraCaptureCallback, backgroundHandler);
+    } catch (CameraAccessException e) {
+      e.printStackTrace();
+    }
+  }
   private void createCameraPreviewSession() {
     try {
       sharedSession.setCameraTextureName(backgroundRenderer.getTextureId());
@@ -640,6 +732,11 @@ public class SharedCameraActivity extends AppCompatActivity
         }
       }
 
+      mSensitivityRange = characteristics.get(CameraCharacteristics.SENSOR_INFO_SENSITIVITY_RANGE);
+      mExposureTimeRange = characteristics.get(CameraCharacteristics.SENSOR_INFO_EXPOSURE_TIME_RANGE);
+      Log.d(TAG, "cameraId["+cameraId+"] sensitivity range:"+ mSensitivityRange);
+      Log.d(TAG, "cameraId["+cameraId+"] exposureTimeRange range:"+ mExposureTimeRange);
+
       // Prevent app crashes due to quick operations on camera open / close by waiting for the
       // capture session's onActive() callback to be triggered.
       captureSessionChangesPossible = false;
@@ -730,10 +827,10 @@ public class SharedCameraActivity extends AppCompatActivity
                       + cpuImagesProcessed
                       + "\n\nMode: "
                       + (arMode ? "AR" : "non-AR")
-                      + " \nARCore active: "
-                      + arcoreActive
-                      + " \nShould update surface texture: "
-                      + shouldUpdateSurfaceTexture.get()));
+                      + " \nARCore active: " + arcoreActive
+                      + " \nShould update surface texture: " + shouldUpdateSurfaceTexture.get()
+                      + " \nISO:" + mCurrentSensitivity
+                      + " \nSS:" + mCurrentExposureTime));
     }
   }
 
